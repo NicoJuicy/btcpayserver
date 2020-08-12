@@ -46,11 +46,6 @@ public class BitcoinLikePayoutHandler : IPayoutHandler
 
     public async Task TrackClaim(PaymentMethodId paymentMethodId, IClaimDestination claimDestination)
     {
-        if (!CanHandle(paymentMethodId))
-        {
-            return;
-        }
-
         var network = _btcPayNetworkProvider.GetNetwork<BTCPayNetwork>(paymentMethodId.CryptoCode);
         var explorerClient = _explorerClientProvider.GetExplorerClient(network);
         if (claimDestination is IBitcoinLikeClaimDestination bitcoinLikeClaimDestination)
@@ -59,11 +54,6 @@ public class BitcoinLikePayoutHandler : IPayoutHandler
 
     public async Task<IClaimDestination> ParseClaimDestination(PaymentMethodId paymentMethodId, string destination)
     {
-        if (!CanHandle(paymentMethodId))
-        {
-            return null;
-        }
-
         var network = _btcPayNetworkProvider.GetNetwork<BTCPayNetwork>(paymentMethodId.CryptoCode);
         destination = destination.Trim();
         try
@@ -112,11 +102,6 @@ public class BitcoinLikePayoutHandler : IPayoutHandler
 
     public Task<decimal> GetMinimumPayoutAmount(PaymentMethodId paymentMethodId, IClaimDestination claimDestination)
     {
-        if (!CanHandle(paymentMethodId))
-        {
-            return Task.FromResult(0m);
-        }
-
         if (_btcPayNetworkProvider.GetNetwork<BTCPayNetwork>(paymentMethodId.CryptoCode)?
                 .NBitcoinNetwork?
                 .Consensus?
