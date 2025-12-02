@@ -85,12 +85,10 @@ public class SubscriptionHostedService(
             var checkout = await ctx.PlanCheckouts.GetCheckout(subscribeRequest.CheckoutId);
             if (checkout?.IsExpired is not false)
                 throw new InvalidOperationException("Checkout not found or expired");
-            var redirectLink =
-                checkout.GetRedirectUrl() ??
-                checkout.Plan.Offering.SuccessRedirectUrl ??
-                linkGenerator.PlanCheckoutDefaultLink(checkout.BaseUrl);
-            if (checkout.SuccessRedirectUrl != redirectLink)
+            if (checkout.SuccessRedirectUrl is null)
             {
+                var redirectLink = checkout.Plan.Offering.SuccessRedirectUrl ??
+                                   linkGenerator.PlanCheckoutDefaultLink(checkout.BaseUrl);
                 checkout.SuccessRedirectUrl = redirectLink;
                 await ctx.SaveChangesAsync();
             }
@@ -245,7 +243,7 @@ public class SubscriptionHostedService(
         var (now, ctx, cancellationToken) = (subCtx.Now, subCtx.Context, subCtx.CancellationToken);
         var query = ctx.Subscribers.IncludeAll();
         var members = await selector.Where(query).ToListAsync(cancellationToken);
-        await ctx.PlanEntitlements.FetchPlanEntitlementsAsync(members.Select(m => m.Plan));
+        await ctx.PlanFeatures.FetchPlanFeaturesAsync(members.Select(m => m.Plan));
         foreach (var m in members)
         {
             var newPhase = m.GetExpectedPhase(now);
@@ -557,11 +555,11 @@ public class SubscriptionHostedService(
         checkout.Subscriber = sub;
         checkout.SubscriberId = sub.Id;
         await ctx.SaveChangesAsync();
-        subCtx.AddEvent(new SubscriptionEvent.NewSubscriber(sub));
+        subCtx.AddEvent(new SubscriptionEvent.NewSubscriber(sub, checkout.BaseUrl));
         return sub;
     }
 
-    private static async Task UpdatePlanStats(ApplicationDbContext ctx, string planId)
+    public static async Task UpdatePlanStats(ApplicationDbContext ctx, string planId)
     {
         await ctx.Database.GetDbConnection()
             .ExecuteAsync("""
