@@ -2,11 +2,12 @@ using System.Linq;
 using System.Threading.Tasks;
 using BTCPayServer.Client;
 using BTCPayServer.Data;
+using BTCPayServer.Security;
 using BTCPayServer.Services.Stores;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 
-namespace BTCPayServer.Security.Bitpay
+namespace BTCPayServer.Plugins.Bitpay.Security
 {
     public class BitpayAuthorizationHandler : AuthorizationHandler<PolicyRequirement>
     {
@@ -22,6 +23,7 @@ namespace BTCPayServer.Security.Bitpay
             _storeRepository = storeRepository;
             _tokenRepository = tokenRepository;
         }
+
         protected override async Task HandleRequirementAsync(AuthorizationHandlerContext context, PolicyRequirement requirement)
         {
             string storeId = null;

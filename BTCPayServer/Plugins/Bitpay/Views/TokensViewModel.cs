@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using BTCPayServer.Validation;
 using Microsoft.AspNetCore.Mvc.Rendering;
 
-namespace BTCPayServer.Models.StoreViewModels
+namespace BTCPayServer.Plugins.Bitpay.Views
 {
     public class CreateTokenViewModel
     {

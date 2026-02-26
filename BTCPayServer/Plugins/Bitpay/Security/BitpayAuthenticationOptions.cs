@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Authentication;
 
-namespace BTCPayServer.Security.Bitpay
+namespace BTCPayServer.Plugins.Bitpay.Security
 {
     public class BitpayAuthenticationOptions : AuthenticationSchemeOptions
     {

@@ -2,6 +2,7 @@
 @using Microsoft.AspNetCore.Mvc.TagHelpers
 @model TokensViewModel
 @{
+    Layout = "_Layout";
     ViewData.SetLayoutModel(new LayoutModel(nameof(StoreNavPages.Tokens), StringLocalizer["Access Tokens"]).SetCategory(WellKnownCategories.Store));
 }
 

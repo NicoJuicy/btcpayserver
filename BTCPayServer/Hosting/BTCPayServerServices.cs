@@ -6,11 +6,9 @@ using BTCPayServer.Abstractions.Contracts;
 using BTCPayServer.Abstractions.Extensions;
 using BTCPayServer.Abstractions.Models;
 using BTCPayServer.Abstractions.Services;
-using BTCPayServer.Client;
 using BTCPayServer.Common;
 using BTCPayServer.Configuration;
 using BTCPayServer.Controllers;
-using BTCPayServer.Controllers.Greenfield;
 using BTCPayServer.Data;
 using BTCPayServer.Data.Payouts.LightningLike;
 using BTCPayServer.Forms;
@@ -34,7 +32,6 @@ using BTCPayServer.Plugins;
 using BTCPayServer.Rating;
 using BTCPayServer.Rating.Providers;
 using BTCPayServer.Security;
-using BTCPayServer.Security.Bitpay;
 using BTCPayServer.Security.Greenfield;
 using BTCPayServer.Services;
 using BTCPayServer.Services.Apps;
@@ -75,8 +72,6 @@ using BTCPayServer.Payouts;
 using ExchangeSharp;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.Extensions.Localization;
-using Microsoft.AspNetCore.Mvc.Localization;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 
@@ -177,7 +172,6 @@ namespace BTCPayServer.Hosting
             services.TryAddSingleton<InvoiceRepository>();
             services.AddSingleton<PaymentService>();
             services.AddSingleton<BTCPayServerEnvironment>();
-            services.TryAddSingleton<TokenRepository>();
             services.TryAddSingleton<WalletRepository>();
             services.TryAddSingleton<EventAggregator>();
             services.TryAddSingleton<PaymentRequestService>();
@@ -464,7 +458,6 @@ namespace BTCPayServer.Hosting
             services.AddSingleton<IHostedService>(s => s.GetRequiredService<PaymentRequestStreamer>());
             services.AddSingleton<IBackgroundJobClient, BackgroundJobClient>();
             services.AddScoped<IAuthorizationHandler, CookieAuthorizationHandler>();
-            services.AddScoped<IAuthorizationHandler, BitpayAuthorizationHandler>();
 
             services.AddSingleton<INotificationHandler, NewVersionNotification.Handler>();
             services.AddSingleton<INotificationHandler, NewUserRequiresApprovalNotification.Handler>();
@@ -489,7 +482,6 @@ namespace BTCPayServer.Hosting
             services.TryAddSingleton<RateFetcher>();
 
             services.TryAddScoped<IHttpContextAccessor, HttpContextAccessor>();
-            services.AddTransient<BitpayAccessTokenController>();
             services.AddTransient<UIInvoiceController>();
             services.AddTransient<UIPaymentRequestController>();
             services.AddSingleton<LabelService>();
@@ -773,14 +765,13 @@ namespace BTCPayServer.Hosting
                     options.AccessDeniedPath = "/errors/403";
                     options.LogoutPath = "/logout";
                 })
-                .AddBitpayAuthentication()
                 .AddAPIKeyAuthentication();
         }
 
         public static IApplicationBuilder UsePayServer(this IApplicationBuilder app)
         {
-            app.UseMiddleware<GreenfieldMiddleware>();
-            app.UseMiddleware<BTCPayMiddleware>();
+            app.UseMiddleware<SetCultureMiddleware>();
+            app.UseMiddleware<OnionLocationMiddleware>();
             return app;
         }
 

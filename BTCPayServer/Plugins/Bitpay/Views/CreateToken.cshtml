@@ -4,6 +4,7 @@
     ViewData.SetLayoutModel(new(nameof(StoreNavPages.Tokens), StringLocalizer["Create New Token"]));
     ViewBag.HidePublicKey ??= false;
     ViewBag.ShowStores ??= false;
+    Layout = "_Layout";
 }
 
 <form method="post">

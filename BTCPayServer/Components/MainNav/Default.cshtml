@@ -49,9 +49,7 @@
                                 <li class="nav-item nav-item-sub" permission="@Policies.CanViewStoreSettings">
                                     <a layout-menu-item="@(nameof(StoreNavPages.CheckoutAppearance))" asp-controller="UIStores" asp-action="CheckoutAppearance" asp-route-storeId="@Model.Store.Id" text-translate="true">Checkout Appearance</a>
                                 </li>
-                                <li class="nav-item nav-item-sub" permission="@Policies.CanViewStoreSettings">
-                                    <a layout-menu-item="@nameof(StoreNavPages.Tokens)" asp-controller="UIStores" asp-action="ListTokens" asp-route-storeId="@Model.Store.Id" text-translate="true">Access Tokens</a>
-                                </li>
+
                                 <li class="nav-item nav-item-sub" permission="@Policies.CanViewStoreSettings">
                                     <a layout-menu-item="@(nameof(StoreNavPages.Users))" asp-controller="UIStores" asp-action="StoreUsers" asp-route-storeId="@Model.Store.Id" text-translate="true">Users</a>
                                 </li>
@@ -70,6 +68,7 @@
                                 <li class="nav-item nav-item-sub" permission="@Policies.CanViewStoreSettings">
                                     <a layout-menu-item="@(nameof(StoreNavPages.Forms))" asp-controller="UIForms" asp-action="FormsList" asp-route-storeId="@Model.Store.Id" text-translate="true">Forms</a>
                                 </li>
+                                <vc:ui-extension-point location="store-category-nav" model="@Model"/>
                             }
                             <vc:ui-extension-point location="store-nav" model="@Model"/>
                         </ul>

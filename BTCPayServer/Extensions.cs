@@ -693,38 +693,6 @@ namespace BTCPayServer
             return uri.DnsSafeHost.EndsWith(".onion", StringComparison.OrdinalIgnoreCase);
         }
 
-        public static string GetSIN(this ClaimsPrincipal principal)
-        {
-            return principal.Claims.Where(c => c.Type == Security.Bitpay.BitpayClaims.SIN).Select(c => c.Value).FirstOrDefault();
-        }
-
-        public static void SetIsBitpayAPI(this HttpContext ctx, bool value)
-        {
-            NBitcoin.Extensions.TryAdd(ctx.Items, "IsBitpayAPI", value);
-        }
-
-        public static bool GetIsBitpayAPI(this HttpContext ctx)
-        {
-            return ctx.Items.TryGetValue("IsBitpayAPI", out object obj) &&
-                  obj is bool b && b;
-        }
-
-        public static void SetBitpayAuth(this HttpContext ctx, (string Signature, String Id, String Authorization) value)
-        {
-            NBitcoin.Extensions.TryAdd(ctx.Items, "BitpayAuth", value);
-        }
-
-        public static bool TryGetBitpayAuth(this HttpContext ctx, out (string Signature, String Id, String Authorization) result)
-        {
-            if (ctx.Items.TryGetValue("BitpayAuth", out object obj))
-            {
-                result = ((string Signature, String Id, String Authorization))obj;
-                return true;
-            }
-            result = default;
-            return false;
-        }
-
         public static UserPrefsCookie GetUserPrefsCookie(this HttpContext ctx)
         {
             var prefCookie = new UserPrefsCookie();

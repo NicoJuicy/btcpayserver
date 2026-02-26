@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace BTCPayServer.Models.StoreViewModels
+namespace BTCPayServer.Plugins.Bitpay.Views
 {
     public class PairingModel
     {

@@ -5,7 +5,7 @@ using System.Security.Claims;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Threading.Tasks;
-using BTCPayServer.Services.Stores;
+using BTCPayServer.Plugins.Bitpay.Models;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Extensions;
@@ -14,45 +14,58 @@ using Microsoft.Extensions.Options;
 using NBitcoin;
 using NBitcoin.DataEncoders;
 using NBitpayClient.Extensions;
+using Newtonsoft.Json;
 
 
-namespace BTCPayServer.Security.Bitpay
+namespace BTCPayServer.Plugins.Bitpay.Security
 {
-    public class BitpayAuthenticationHandler : AuthenticationHandler<BitpayAuthenticationOptions>
+    public class BitpayAuthenticationHandler(
+        TokenRepository tokenRepository,
+        IOptionsMonitor<BitpayAuthenticationOptions> options,
+        ILoggerFactory logger,
+        UrlEncoder encoder)
+        : AuthenticationHandler<BitpayAuthenticationOptions>(options, logger, encoder)
     {
-        readonly StoreRepository _StoreRepository;
-        readonly TokenRepository _TokenRepository;
-        public BitpayAuthenticationHandler(
-            TokenRepository tokenRepository,
-            StoreRepository storeRepository,
-            IOptionsMonitor<BitpayAuthenticationOptions> options, ILoggerFactory logger, UrlEncoder encoder) : base(options, logger, encoder)
+        const string BitpayAuthErrorKey = nameof(BitpayAuthErrorKey);
+        protected override Task HandleChallengeAsync(AuthenticationProperties properties)
         {
-            _TokenRepository = tokenRepository;
-            _StoreRepository = storeRepository;
+            var reason = Context.Items[BitpayAuthErrorKey]?.ToString() ?? "Authentication required";
+            Response.StatusCode = StatusCodes.Status401Unauthorized;
+            Response.ContentType = "application/json";
+            return Response.WriteAsync(JsonConvert.SerializeObject(new BitpayErrorsModel()
+            {
+                Errors = [new() { Error = reason }],
+                Error = reason
+            }));
         }
 
         protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
         {
-            if (!Context.Request.HttpContext.TryGetBitpayAuth(out var bitpayAuth))
-                return AuthenticateResult.NoResult();
+            Context.Request.HttpContext.TryGetBitpayAuth(out var bitpayAuth);
             if (!string.IsNullOrEmpty(bitpayAuth.Signature) && !string.IsNullOrEmpty(bitpayAuth.Id))
             {
                 var sin = await CheckBitId(Context.Request.HttpContext, bitpayAuth.Signature, bitpayAuth.Id);
                 if (sin == null)
-                    return AuthenticateResult.Fail("BitId authentication failed");
+                    return Fail("BitId authentication failed");
                 return Success(BitpayClaims.SIN, sin, BitpayAuthenticationTypes.SinAuthentication);
             }
             else if (!string.IsNullOrEmpty(bitpayAuth.Authorization))
             {
-                var storeId = await GetStoreIdFromAuth(Context.Request.HttpContext, bitpayAuth.Authorization);
+                var storeId = await GetStoreIdFromAuth(bitpayAuth.Authorization);
                 if (storeId == null)
-                    return AuthenticateResult.Fail("ApiKey authentication failed");
+                    return Fail("ApiKey authentication failed");
                 return Success(BitpayClaims.ApiKeyStoreId, storeId, BitpayAuthenticationTypes.ApiKeyAuthentication);
             }
             else
             {
                 return Success(null, null, BitpayAuthenticationTypes.Anonymous);
             }
+        }
+
+        private AuthenticateResult Fail(string reason)
+        {
+            Context.Items[BitpayAuthErrorKey] = reason;
+            return AuthenticateResult.Fail(reason);
         }
 
         private AuthenticateResult Success(string claimType, string claimValue, string authenticationType)
@@ -89,7 +102,7 @@ namespace BTCPayServer.Security.Bitpay
             return null;
         }
 
-        private async Task<string> GetStoreIdFromAuth(HttpContext httpContext, string auth)
+        private async Task<string> GetStoreIdFromAuth(string auth)
         {
             var splitted = auth.Split(' ', StringSplitOptions.RemoveEmptyEntries);
             if (splitted.Length != 2 || !splitted[0].Equals("Basic", StringComparison.OrdinalIgnoreCase))
@@ -106,7 +119,7 @@ namespace BTCPayServer.Security.Bitpay
             {
                 return null;
             }
-            return await _TokenRepository.GetStoreIdFromAPIKey(apiKey);
+            return await tokenRepository.GetStoreIdFromAPIKey(apiKey);
         }
     }
 }

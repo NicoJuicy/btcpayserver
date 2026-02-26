@@ -1,7 +1,7 @@
 using System;
 using NBitpayClient;
 
-namespace BTCPayServer.Security.Bitpay
+namespace BTCPayServer.Plugins.Bitpay.Security
 {
     public class BitTokenEntity
     {

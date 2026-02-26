@@ -332,7 +332,7 @@ namespace BTCPayServer.Hosting
             app.UseExceptionHandler("/errors/{0}");
             app.UsePayServer();
             app.UseRouting();
-            app.UseCors();
+            app.UseCors(CorsPolicies.All);
 
             app.UseStaticFiles(new StaticFileOptions
             {

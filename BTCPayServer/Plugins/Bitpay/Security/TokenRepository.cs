@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using NBitcoin;
 using NBitcoin.DataEncoders;
 
-namespace BTCPayServer.Security.Bitpay
+namespace BTCPayServer.Plugins.Bitpay.Security
 {
     public enum PairingResult
     {

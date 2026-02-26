@@ -1,6 +1,6 @@
 using Newtonsoft.Json;
 
-namespace BTCPayServer.Models
+namespace BTCPayServer.Plugins.Bitpay.Models
 {
     public class BitpayErrorsModel
     {

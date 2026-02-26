@@ -116,7 +116,7 @@ namespace BTCPayServer.Tests
         {
             await RegisterAsync(isAdmin);
             await CreateStoreAsync();
-            var store = GetController<UIStoresController>();
+            var store = GetController<BTCPayServer.Plugins.Bitpay.Controllers.UIStoresTokenController>();
             var pairingCode = BitPay.RequestClientAuthorization("test", Facade.Merchant);
             Assert.IsType<ViewResult>(await store.RequestPairing(pairingCode.ToString()));
             await store.Pair(pairingCode.ToString(), StoreId);

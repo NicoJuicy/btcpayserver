@@ -1,29 +1,53 @@
 #nullable enable
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 using BTCPayServer.Abstractions.Constants;
 using BTCPayServer.Abstractions.Models;
 using BTCPayServer.Client;
+using BTCPayServer.Controllers;
 using BTCPayServer.Data;
 using BTCPayServer.Models;
-using BTCPayServer.Models.StoreViewModels;
-using BTCPayServer.Security.Bitpay;
+using BTCPayServer.Plugins.Bitpay.Security;
+using BTCPayServer.Plugins.Bitpay.Views;
+using BTCPayServer.Services.Invoices;
+using BTCPayServer.Services.Stores;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
+using Microsoft.Extensions.Localization;
 using NBitcoin;
 using NBitcoin.DataEncoders;
 
-namespace BTCPayServer.Controllers;
+namespace BTCPayServer.Plugins.Bitpay.Controllers;
 
-public partial class UIStoresController
+[Route("stores")]
+[Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie)]
+[Authorize(Policy = Policies.CanViewStoreSettings, AuthenticationSchemes = AuthenticationSchemes.Cookie)]
+[Area(BitpayPlugin.Area)]
+public class UIStoresTokenController(
+    TokenRepository tokenRepository,
+    BitpayAccessTokenController tokenController,
+    IStringLocalizer stringLocalizer,
+    StoreRepository storeRepository,
+    UserManager<ApplicationUser> userManager,
+    IHtmlHelper html,
+    PaymentMethodHandlerDictionary handlers) : Controller
 {
+    public IStringLocalizer StringLocalizer { get; } = stringLocalizer;
+    public StoreData CurrentStore => HttpContext.GetStoreData() ?? throw new InvalidOperationException("Store not found");
+    private string? GetUserId() => userManager.GetUserId(User);
+
+    [TempData]
+    public bool StoreNotConfigured { get; set; }
+    public string? GeneratedPairingCode { get; set; }
     [HttpGet("{storeId}/tokens")]
     [Authorize(Policy = Policies.CanViewStoreSettings, AuthenticationSchemes = AuthenticationSchemes.Cookie)]
     public async Task<IActionResult> ListTokens()
     {
         var model = new TokensViewModel();
-        var tokens = await _tokenRepository.GetTokensByStoreIdAsync(CurrentStore.Id);
+        var tokens = await tokenRepository.GetTokensByStoreIdAsync(CurrentStore.Id);
         model.StoreNotConfigured = StoreNotConfigured;
         model.Tokens = tokens.Select(t => new TokenViewModel()
         {
@@ -32,7 +56,7 @@ public partial class UIStoresController
             Id = t.Value
         }).ToArray();
 
-        model.ApiKey = (await _tokenRepository.GetLegacyAPIKeys(CurrentStore.Id)).FirstOrDefault();
+        model.ApiKey = (await tokenRepository.GetLegacyAPIKeys(CurrentStore.Id)).FirstOrDefault();
         model.EncodedApiKey = model.ApiKey == null ? "*API Key*" : Encoders.Base64.EncodeData(Encoders.ASCII.DecodeData(model.ApiKey));
         return View(model);
     }
@@ -41,20 +65,20 @@ public partial class UIStoresController
     [Authorize(Policy = Policies.CanModifyStoreSettings, AuthenticationSchemes = AuthenticationSchemes.Cookie)]
     public async Task<IActionResult> RevokeToken(string tokenId)
     {
-        var token = await _tokenRepository.GetToken(tokenId);
+        var token = await tokenRepository.GetToken(tokenId);
         if (token == null || token.StoreId != CurrentStore.Id)
             return NotFound();
-        return View("Confirm", new ConfirmModel(StringLocalizer["Revoke the token"], $"The access token with the label <strong>{_html.Encode(token.Label)}</strong> will be revoked. Do you wish to continue?", "Revoke"));
+        return View("Confirm", new ConfirmModel(StringLocalizer["Revoke the token"], $"The access token with the label <strong>{html.Encode(token.Label)}</strong> will be revoked. Do you wish to continue?", "Revoke"));
     }
 
     [HttpPost("{storeId}/tokens/{tokenId}/revoke")]
     [Authorize(Policy = Policies.CanModifyStoreSettings, AuthenticationSchemes = AuthenticationSchemes.Cookie)]
     public async Task<IActionResult> RevokeTokenConfirm(string tokenId)
     {
-        var token = await _tokenRepository.GetToken(tokenId);
+        var token = await tokenRepository.GetToken(tokenId);
         if (token == null ||
             token.StoreId != CurrentStore.Id ||
-            !await _tokenRepository.DeleteToken(tokenId))
+            !await tokenRepository.DeleteToken(tokenId))
             TempData[WellKnownTempData.ErrorMessage] = "Failure to revoke this token.";
         else
             TempData[WellKnownTempData.SuccessMessage] = "Token revoked";
@@ -65,7 +89,7 @@ public partial class UIStoresController
     [Authorize(Policy = Policies.CanModifyStoreSettings, AuthenticationSchemes = AuthenticationSchemes.Cookie)]
     public async Task<IActionResult> ShowToken(string tokenId)
     {
-        var token = await _tokenRepository.GetToken(tokenId);
+        var token = await tokenRepository.GetToken(tokenId);
         if (token == null || token.StoreId != CurrentStore.Id)
             return NotFound();
         return View(token);
@@ -76,8 +100,8 @@ public partial class UIStoresController
     public IActionResult CreateToken(string storeId)
     {
         var model = new CreateTokenViewModel();
-        ViewBag.HidePublicKey = storeId == null;
-        ViewBag.ShowStores = storeId == null;
+        ViewBag.HidePublicKey = false;
+        ViewBag.ShowStores = false;
         model.StoreId = storeId;
         return View(model);
     }
@@ -97,7 +121,7 @@ public partial class UIStoresController
         var store = model.StoreId switch
         {
             null => CurrentStore,
-            _ => await _storeRepo.FindStore(storeId, userId)
+            _ => await storeRepository.FindStore(storeId, userId)
         };
         if (store == null)
             return Challenge(AuthenticationSchemes.Cookie);
@@ -110,18 +134,18 @@ public partial class UIStoresController
         string? pairingCode;
         if (model.PublicKey == null)
         {
-            tokenRequest.PairingCode = await _tokenRepository.CreatePairingCodeAsync();
-            await _tokenRepository.UpdatePairingCode(new PairingCodeEntity()
+            tokenRequest.PairingCode = await tokenRepository.CreatePairingCodeAsync();
+            await tokenRepository.UpdatePairingCode(new PairingCodeEntity()
             {
                 Id = tokenRequest.PairingCode,
                 Label = model.Label,
             });
-            await _tokenRepository.PairWithStoreAsync(tokenRequest.PairingCode, store.Id);
+            await tokenRepository.PairWithStoreAsync(tokenRequest.PairingCode, store.Id);
             pairingCode = tokenRequest.PairingCode;
         }
         else
         {
-            pairingCode = (await _tokenController.Tokens(tokenRequest)).Data[0].PairingCode;
+            pairingCode = (await tokenController.Tokens(tokenRequest)).Data[0].PairingCode;
         }
 
         GeneratedPairingCode = pairingCode;
@@ -142,7 +166,7 @@ public partial class UIStoresController
         var model = new CreateTokenViewModel();
         ViewBag.HidePublicKey = true;
         ViewBag.ShowStores = true;
-        var stores = (await _storeRepo.GetStoresByUserId(userId)).Where(data => data.HasPermission(userId, Policies.CanModifyStoreSettings)).ToArray();
+        var stores = (await storeRepository.GetStoresByUserId(userId)).Where(data => data.HasPermission(userId, Policies.CanModifyStoreSettings)).ToArray();
 
         model.Stores = new SelectList(stores, nameof(CurrentStore.Id), nameof(CurrentStore.StoreName));
         if (!model.Stores.Any())
@@ -169,12 +193,12 @@ public partial class UIStoresController
             return NotFound();
         if (command == "revoke")
         {
-            await _tokenRepository.RevokeLegacyAPIKeys(CurrentStore.Id);
+            await tokenRepository.RevokeLegacyAPIKeys(CurrentStore.Id);
             TempData[WellKnownTempData.SuccessMessage] = "API Key revoked";
         }
         else
         {
-            await _tokenRepository.GenerateLegacyAPIKey(CurrentStore.Id);
+            await tokenRepository.GenerateLegacyAPIKey(CurrentStore.Id);
             TempData[WellKnownTempData.SuccessMessage] = "API Key re-generated";
         }
 
@@ -192,25 +216,22 @@ public partial class UIStoresController
         if (userId == null)
             return Challenge(AuthenticationSchemes.Cookie);
 
-        if (pairingCode == null)
-            return NotFound();
-
         if (selectedStore != null)
         {
-            var store = await _storeRepo.FindStore(selectedStore, userId);
+            var store = await storeRepository.FindStore(selectedStore, userId);
             if (store == null)
                 return NotFound();
             HttpContext.SetStoreData(store);
         }
 
-        var pairing = await _tokenRepository.GetPairingAsync(pairingCode);
+        var pairing = await tokenRepository.GetPairingAsync(pairingCode);
         if (pairing == null)
         {
             TempData[WellKnownTempData.ErrorMessage] = "Unknown pairing code";
             return RedirectToAction(nameof(UIHomeController.Index), "UIHome");
         }
 
-        var stores = (await _storeRepo.GetStoresByUserId(userId)).Where(data => data.HasPermission(userId, Policies.CanModifyStoreSettings)).ToArray();
+        var stores = (await storeRepository.GetStoresByUserId(userId)).Where(data => data.HasPermission(userId, Policies.CanModifyStoreSettings)).ToArray();
         return View(new PairingModel
         {
             Id = pairing.Id,
@@ -229,18 +250,16 @@ public partial class UIStoresController
     [Authorize(Policy = Policies.CanModifyStoreSettings, AuthenticationSchemes = AuthenticationSchemes.Cookie)]
     public async Task<IActionResult> Pair(string pairingCode, string storeId)
     {
-        if (pairingCode == null)
-            return NotFound();
         var store = CurrentStore;
-        var pairing = await _tokenRepository.GetPairingAsync(pairingCode);
-        if (store == null || pairing == null)
+        var pairing = await tokenRepository.GetPairingAsync(pairingCode);
+        if (pairing == null || store.Id != storeId)
             return NotFound();
 
-        var pairingResult = await _tokenRepository.PairWithStoreAsync(pairingCode, store.Id);
+        var pairingResult = await tokenRepository.PairWithStoreAsync(pairingCode, store.Id);
         if (pairingResult == PairingResult.Complete || pairingResult == PairingResult.Partial)
         {
             var excludeFilter = store.GetStoreBlob().GetExcludedPaymentMethods();
-            StoreNotConfigured = store.GetPaymentMethodConfigs(_handlers).All(p => excludeFilter.Match(p.Key));
+            StoreNotConfigured = store.GetPaymentMethodConfigs(handlers).All(p => excludeFilter.Match(p.Key));
             TempData[WellKnownTempData.SuccessMessage] = "Pairing is successful";
             if (pairingResult == PairingResult.Partial)
                 TempData[WellKnownTempData.SuccessMessage] = $"Server initiated pairing code: {pairingCode}";
