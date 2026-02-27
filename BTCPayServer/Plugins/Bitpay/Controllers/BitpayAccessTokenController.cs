@@ -13,7 +13,7 @@ namespace BTCPayServer.Plugins.Bitpay.Controllers;
 [Authorize(AuthenticationSchemes = AuthenticationSchemes.Bitpay)]
 [BitpayEndpointSelectorPolicy.BitpayEndpointMetadata]
 [BitpayFilter]
-public class BitpayAccessTokenController(TokenRepository tokenRepository) : Controller
+public class BitpayAccessTokenController(TokenRepository tokenRepository) : ControllerBase
 {
 
     [HttpGet]

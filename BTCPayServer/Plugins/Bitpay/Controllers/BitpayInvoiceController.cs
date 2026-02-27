@@ -25,7 +25,7 @@ namespace BTCPayServer.Plugins.Bitpay.Controllers;
 [BitpayEndpointSelectorPolicy.BitpayEndpointMetadata]
 [Authorize(Policies.CanCreateInvoice, AuthenticationSchemes = AuthenticationSchemes.Bitpay)]
 [BitpayFilter]
-public class BitpayInvoiceController : Controller
+public class BitpayInvoiceController : ControllerBase
 {
     private readonly UIInvoiceController _InvoiceController;
     private readonly Dictionary<PaymentMethodId, IPaymentMethodBitpayAPIExtension> _bitpayExtensions;
@@ -101,7 +101,7 @@ public class BitpayInvoiceController : Controller
         var entities = (await _InvoiceRepository.GetInvoices(query))
             .Select((o) => o.EntityToDTO(_bitpayExtensions, Url, _currencyNameTable)).ToArray();
 
-        return Json(DataWrapper.Create(entities));
+        return Ok(DataWrapper.Create(entities));
     }
 
     internal async Task<DataWrapper<InvoiceResponse>> CreateInvoiceCore(BitpayCreateInvoiceRequest invoice,

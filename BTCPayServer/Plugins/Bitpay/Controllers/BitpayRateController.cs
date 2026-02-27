@@ -23,7 +23,7 @@ namespace BTCPayServer.Plugins.Bitpay.Controllers;
 
 [Authorize(Policy = ServerPolicies.CanGetRates.Key, AuthenticationSchemes = AuthenticationSchemes.Bitpay)]
 [BitpayFilter]
-public class BitpayRateController : Controller
+public class BitpayRateController : ControllerBase
 {
     readonly RateFetcher _rateProviderFactory;
     readonly CurrencyNameTable _currencyNameTable;
@@ -69,8 +69,8 @@ public class BitpayRateController : Controller
         var currencypairs = BuildCurrencyPairs(currencyCodes, baseCurrency);
 
         var result = await GetRates2(currencypairs, null, cryptoCode, cancellationToken);
-        var rates = (result as JsonResult)?.Value as Rate[];
-        return rates == null ? result : Json(new DataWrapper<Rate[]>(rates));
+        var rates = (result as OkObjectResult)?.Value as Rate[];
+        return rates == null ? result : Ok(new DataWrapper<Rate[]>(rates));
     }
 
     [HttpGet("rates/{baseCurrency}/{currency}")]
@@ -79,9 +79,9 @@ public class BitpayRateController : Controller
         CancellationToken cancellationToken = default)
     {
         var result = await GetRates2($"{baseCurrency}_{currency}", null, cryptoCode, cancellationToken);
-        return (result as JsonResult)?.Value is not Rate[] { Length: > 0 } rates
+        return (result as OkObjectResult)?.Value is not Rate[] { Length: > 0 } rates
             ? result
-            : Json(new DataWrapper<Rate>(rates.FirstOrDefault()));
+            : Ok(new DataWrapper<Rate>(rates.FirstOrDefault()));
     }
 
     [HttpGet("rates")]
@@ -90,9 +90,9 @@ public class BitpayRateController : Controller
         CancellationToken cancellationToken = default)
     {
         var result = await GetRates2(currencyPairs, storeId, cryptoCode, cancellationToken);
-        return (result as JsonResult)?.Value is not Rate[] rates
+        return (result as OkObjectResult)?.Value is not Rate[] rates
             ? result
-            : Json(new DataWrapper<Rate[]>(rates));
+            : Ok(new DataWrapper<Rate[]>(rates));
     }
 
     [AllowAnonymous]
@@ -102,7 +102,7 @@ public class BitpayRateController : Controller
         var store = CurrentStore ?? await _storeRepo.FindStore(storeId);
         if (store == null)
         {
-            var err = Json(new BitpayErrorsModel { Error = "Store not found" });
+            var err = Ok(new BitpayErrorsModel { Error = "Store not found" });
             err.StatusCode = 404;
             return err;
         }
@@ -118,7 +118,7 @@ public class BitpayRateController : Controller
 
             if (string.IsNullOrEmpty(currencyPairs))
             {
-                var result = Json(new BitpayErrorsModel()
+                var result = Ok(new BitpayErrorsModel()
                 {
                     Error =
                         "You need to setup the default currency pairs in 'Store Settings / Rates' or specify 'currencyPairs' query parameter (eg. BTC_USD,LTC_CAD)."
@@ -134,7 +134,7 @@ public class BitpayRateController : Controller
         {
             if (!CurrencyPair.TryParse(currency, out var pair))
             {
-                var result = Json(new BitpayErrorsModel() { Error = $"Currency pair {currency} incorrectly formatted" });
+                var result = Ok(new BitpayErrorsModel() { Error = $"Currency pair {currency} incorrectly formatted" });
                 result.StatusCode = 400;
                 return result;
             }
@@ -144,7 +144,7 @@ public class BitpayRateController : Controller
 
         var fetching = _rateProviderFactory.FetchRates(pairs, rules, new StoreIdRateContext(store.Id), cancellationToken);
         await Task.WhenAll(fetching.Select(f => f.Value).ToArray());
-        return Json(pairs
+        return Ok(pairs
             .Select(r => (Pair: r, Value: fetching[r].GetAwaiter().GetResult().BidAsk?.Bid))
             .Where(r => r.Value.HasValue)
             .Select(r =>
