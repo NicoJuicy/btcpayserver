@@ -1,5 +1,6 @@
 @model BTCPayServer.Plugins.Shopify.Models.ShopifySettings
 @{
+    Layout = "_Layout";
     ViewData.SetLayoutModel(new LayoutModel("shopify", StringLocalizer["Shopify"]).SetCategory(WellKnownCategories.Store));
     var shopifyCredsSet = Model?.IntegratedAt.HasValue is true;
     var shopifyUrl = Model?.ShopifyUrl;
