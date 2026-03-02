@@ -28,7 +28,7 @@ namespace BTCPayServer.Tests;
 public class BitpayTests(ITestOutputHelper log) : UnitTestBase(log)
 {
        [Fact]
-        [Trait("Integration", "Integration")]
+       [Trait("Integration", "Integration")]
         public async Task CanThrowBitpay404Error()
         {
             using var tester = CreateServerTester();
@@ -357,6 +357,7 @@ public class BitpayTests(ITestOutputHelper log) : UnitTestBase(log)
         }
 
         [Fact]
+        [Trait("Playwright", "Playwright-2")]
         public async Task CanUsePairing()
         {
             await using var s = CreatePlaywrightTester();
