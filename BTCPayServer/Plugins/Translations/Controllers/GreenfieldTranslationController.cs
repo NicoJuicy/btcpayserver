@@ -1,6 +1,7 @@
 #nullable enable
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using BTCPayServer.Abstractions.Constants;
 using BTCPayServer.Filters;
 using BTCPayServer.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -8,12 +9,18 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace BTCPayServer.Plugins.Translations.Controllers;
 
-[AllowAnonymous]
-[Area(TranslationsPlugin.Area)]
-public class CheatTranslationController(
+[Authorize(AuthenticationSchemes = AuthenticationSchemes.Greenfield)]
+public class GreenfieldTranslationController(
     IEnumerable<IDefaultTranslationProvider> defaultTranslationProviders) : ControllerBase
 {
+
+    /// <summary>
+    /// This route is used by the btcpayserver-translator project
+    /// in order to extract all the strings that we need to translate.
+    /// </summary>
+    /// <returns></returns>
     [HttpGet("cheat/translations/default-en")]
+    [AllowAnonymous]
     [CheatModeRoute]
     public async Task<IActionResult> GetDefaultEnglishTranslations()
     {
