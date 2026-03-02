@@ -3583,27 +3583,24 @@ namespace BTCPayServer.Tests
             var pluginHookService = tester.PayTester.GetService<IPluginHookService>();
             var beforeHookTcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var afterHookTcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            string hookExpectedPullPayment = pullPayment.Id;
+            bool allowEmptyHook = false;
             TestLogs.LogInformation("Adding hook...");
             pluginHookService.ActionInvoked += (sender, tuple) =>
             {
                 switch (tuple.hook)
                 {
                     case "before-automated-payout-processing":
-                        beforeHookTcs.TrySetResult();
                         var bd = (BeforePayoutActionData)tuple.args;
-                        foreach (var p in bd.Payouts)
-                        {
-                            TestLogs.LogInformation("Before Processed: " + p.Id);
-                        }
+                        TestLogs.LogInformation("Before!");
+                        if (allowEmptyHook || bd.Payouts.Any(p => p.PullPaymentDataId == hookExpectedPullPayment))
+                            beforeHookTcs.TrySetResult();
                         break;
                     case "after-automated-payout-processing":
-                        TestLogs.LogInformation("afterHookTcs.TrySetResult();");
-                        afterHookTcs.TrySetResult();
+                        TestLogs.LogInformation("After!");
                         var ad = (AfterPayoutActionData)tuple.args;
-                        foreach (var p in ad.Payouts)
-                        {
-                            TestLogs.LogInformation("After Processed: " + p.Id);
-                        }
+                        if (allowEmptyHook || ad.Payouts.Any(p => p.PullPaymentDataId == hookExpectedPullPayment))
+                            afterHookTcs.TrySetResult();
                         break;
                 }
             };
@@ -3615,9 +3612,7 @@ namespace BTCPayServer.Tests
                 PayoutMethodId = "BTC",
                 Destination = (await adminClient.GetOnChainWalletReceiveAddress(admin.StoreId, "BTC", true)).Address,
             });
-            TestLogs.LogInformation("Waiting before hook...");
             await beforeHookTcs.Task.WaitAsync(TimeSpan.FromSeconds(5));
-            TestLogs.LogInformation("Waiting before after...");
             await afterHookTcs.Task.WaitAsync(TimeSpan.FromSeconds(5));
             payouts = await adminClient.GetStorePayouts(admin.StoreId);
             try
@@ -3636,8 +3631,10 @@ namespace BTCPayServer.Tests
                 throw;
             }
 
+            hookExpectedPullPayment = null;
             beforeHookTcs = new TaskCompletionSource();
             afterHookTcs = new TaskCompletionSource();
+            allowEmptyHook = true;
             //let's test the threshold limiter
             settings.Threshold = 0.5m;
             await adminClient.UpdateStoreOnChainAutomatedPayoutProcessors(admin.StoreId, "BTC", settings);
@@ -3645,6 +3642,7 @@ namespace BTCPayServer.Tests
             //quick test: when updating processor, it processes instantly
             await beforeHookTcs.Task.WaitAsync(TimeSpan.FromSeconds(5));
             await afterHookTcs.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            allowEmptyHook = false;
 
             settings =
                 Assert.Single(await adminClient.GetStoreOnChainAutomatedPayoutProcessors(admin.StoreId, "BTC"));
