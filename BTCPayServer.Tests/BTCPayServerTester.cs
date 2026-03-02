@@ -198,6 +198,7 @@ namespace BTCPayServer.Tests
                     logging.AddFilter("Microsoft", LogLevel.Error);
                     logging.AddFilter("Microsoft.EntityFrameworkCore.Migrations", LogLevel.Information);
                     logging.AddFilter("Fido2NetLib.DistributedCacheMetadataService", LogLevel.Error);
+                    logging.AddFilter("BTCPayServer.Security", LogLevel.Warning);
 
                     // If LoggerProvider is an ILoggerProvider instance:
                     logging.ClearProviders();
